@@ -1,0 +1,120 @@
+package org.squiddev.forgelint.sideonly;
+
+import com.sun.source.tree.CompilationUnitTree;
+import com.sun.tools.javac.util.Names;
+import org.squiddev.forgelint.CheckInstance;
+
+import javax.lang.model.element.*;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
+import java.util.HashMap;
+import java.util.Map;
+
+class SideProvider {
+	private static final String SIDE_ONLY_NAME = "net.minecraftforge.fml.relauncher.SideOnly";
+
+	private final Types types;
+	private final Names names;
+	private final Elements elements;
+	private final TypeMirror sideOnly;
+
+	private final HashMap<Element, Side> sides = new HashMap<>();
+
+	public SideProvider(CheckInstance instance) {
+		this.types = instance.types();
+		this.names = instance.names();
+		this.elements = instance.elements();
+		this.sideOnly = instance.elements().getTypeElement(SIDE_ONLY_NAME).asType();
+	}
+
+	public Side getInferredSide(Element element) {
+		if (element == null) return Side.BOTH;
+
+		Side side = sides.get(element);
+		if (side == null) {
+			sides.put(element, side = getSideImpl(element));
+		}
+		return side;
+	}
+
+	public Side getAnnotatedSide(Element element) {
+		if (element == null) return Side.BOTH;
+
+		for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
+			if (types.isSameType(mirror.getAnnotationType(), sideOnly)) {
+				for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> pair : mirror.getElementValues().entrySet()) {
+					if (pair.getKey().getSimpleName().equals(names.fromString("value"))) {
+						return Side.valueOf(pair.getValue().getValue().toString());
+					}
+				}
+			}
+		}
+
+		return Side.BOTH;
+	}
+
+	public Side getOverrideSide(ExecutableElement element) {
+		// Attempt to find the overriding method
+		if (element.getEnclosingElement() instanceof TypeElement) {
+			TypeElement parent = (TypeElement) element.getEnclosingElement();
+
+			Side side = getOverrideSide(parent, element, parent.getSuperclass());
+			if (side != Side.BOTH) return side;
+
+			for (TypeMirror mirror : parent.getInterfaces()) {
+				side = getOverrideSide(parent, element, mirror);
+				if (side != Side.BOTH) return side;
+			}
+		}
+
+		return Side.BOTH;
+	}
+
+	private Side getOverrideSide(TypeElement parent, ExecutableElement element, TypeMirror mirror) {
+		Element interfaceElem = types.asElement(mirror);
+		if (interfaceElem instanceof TypeElement) {
+			for (Element child : elements.getAllMembers((TypeElement) interfaceElem)) {
+				if (child instanceof ExecutableElement && elements.overrides(element, (ExecutableElement) child, parent)) {
+					return getInferredSide(child);
+				}
+			}
+		}
+
+		return Side.BOTH;
+	}
+
+	private Side getSideImpl(Element element) {
+		// Directly annotated
+		Side side = getAnnotatedSide(element);
+		if (side != Side.BOTH) return side;
+
+		// Parent classes/methods
+		Element enclosing = element.getEnclosingElement();
+		if (enclosing instanceof TypeElement) {
+			side = getInferredSide(enclosing);
+			if (side != Side.BOTH) return side;
+		}
+
+		// Super class
+		if (element instanceof TypeElement) {
+			side = getInferredSide(types.asElement(((TypeElement) element).getSuperclass()));
+			if (side != Side.BOTH) return side;
+		}
+
+		if (element instanceof ExecutableElement) {
+			side = getOverrideSide((ExecutableElement) element);
+			if (side != Side.BOTH) return side;
+		}
+
+		return Side.BOTH;
+	}
+
+	public Side getInitialSide(CompilationUnitTree tree) {
+		// Some awful heuristics to determine what package we're in.
+		String name = tree.getPackageName().toString();
+		if (name.endsWith(".client") || name.contains(".client.")) return Side.CLIENT;
+
+		return Side.BOTH;
+	}
+}
