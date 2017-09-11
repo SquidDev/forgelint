@@ -103,10 +103,20 @@ public class SideChecker implements Checker {
 					);
 				}
 
-				// Fields are initialised in the constructor, so we need
 				Side childSide = fieldSide.leftLowest(side);
 				scan(tree.getType(), childSide);
 				scan(tree.getNameExpression(), childSide);
+
+				// Stripped fields shouldn't initialise anything as the constructor/static initialiser
+				// isn't removed, hence an error at runtime.
+				if(fieldSide != Side.BOTH && tree.getInitializer() != null) {
+					instance.trees().printMessage(Diagnostic.Kind.ERROR,
+						"Should not initialise a field annotated with @SideOnly. This should be lazily loaded when required.",
+						tree.getInitializer(), root
+					);
+				}
+
+				// Fields are initialised in the constructor, so we need to use the parent state anyway.
 				scan(tree.getInitializer(), side);
 
 				return side;

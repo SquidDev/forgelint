@@ -22,5 +22,5 @@ public class Fields {
 	 * warning: Using a CLIENT method, but this could be either server or client
 	 */
 	@SideOnly(Side.CLIENT)
-	public Minecraft tenMillionYears = Minecraft.getMinecraft();
+	public Minecraft tenMillionYears = null;
 }
