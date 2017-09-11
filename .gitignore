@@ -1,0 +1,23 @@
+# Gradle
+# =========================
+/.gradle
+/build/
+
+# Idea
+# =========================
+*.iml
+*.ipr
+*.iws
+.idea
+/classes
+/out
+
+# Eclipse
+# =========================
+/eclipse/
+/.classpath
+/.project
+/.settings/
+/debug/
+*.lock
+/.metadata/
