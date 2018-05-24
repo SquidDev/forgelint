@@ -213,7 +213,7 @@ public class SideChecker implements Checker {
 					);
 				} else if (!condSide.compatible(side)) {
 					instance.trees().printMessage(Diagnostic.Kind.WARNING,
-						"Checking we're on the " + condSide + ", but we're already on the " + side + ".",
+						"Checking we're on the " + condSide + ", but we're on the " + side + ".",
 						cond, root
 					);
 				}

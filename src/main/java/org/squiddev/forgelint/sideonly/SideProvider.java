@@ -102,11 +102,6 @@ class SideProvider {
 			if (side != Side.BOTH) return side;
 		}
 
-		if (element instanceof ExecutableElement) {
-			side = getOverrideSide((ExecutableElement) element);
-			if (side != Side.BOTH) return side;
-		}
-
 		return Side.BOTH;
 	}
 
