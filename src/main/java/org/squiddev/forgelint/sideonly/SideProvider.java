@@ -4,6 +4,7 @@ import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.IdentifierTree;
 import com.sun.source.tree.MemberSelectTree;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.util.Names;
 import org.squiddev.forgelint.CheckInstance;
 
@@ -124,10 +125,14 @@ class SideProvider {
 			if (side != Side.BOTH) return side;
 		}
 
-		// Super class
-		if (element instanceof TypeElement) {
-			side = getInferredSide(types.asElement(((TypeElement) element).getSuperclass()));
-			if (side != Side.BOTH) return side;
+		try {
+			// Super class
+			if (element instanceof TypeElement) {
+				side = getInferredSide(types.asElement(((TypeElement) element).getSuperclass()));
+				if (side != Side.BOTH) return side;
+			}
+		} catch (Symbol.CompletionFailure ignored) {
+			// We catch in case this super class does not exist in the class path.
 		}
 
 		return Side.BOTH;
