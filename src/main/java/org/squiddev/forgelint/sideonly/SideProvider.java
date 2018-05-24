@@ -1,6 +1,9 @@
 package org.squiddev.forgelint.sideonly;
 
 import com.sun.source.tree.CompilationUnitTree;
+import com.sun.source.tree.ExpressionTree;
+import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.MemberSelectTree;
 import com.sun.tools.javac.util.Names;
 import org.squiddev.forgelint.CheckInstance;
 
@@ -11,13 +14,19 @@ import javax.lang.model.util.Types;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.sun.tools.javac.tree.JCTree.JCFieldAccess;
+import static com.sun.tools.javac.tree.JCTree.JCIdent;
+
 class SideProvider {
 	private static final String SIDE_ONLY_NAME = "net.minecraftforge.fml.relauncher.SideOnly";
+	private static final String SIDE_NAME = "net.minecraftforge.fml.relauncher.Side";
 
 	private final Types types;
 	private final Names names;
 	private final Elements elements;
+
 	private final TypeMirror sideOnly;
+	private final TypeMirror side;
 
 	private final HashMap<Element, Side> sides = new HashMap<>();
 
@@ -25,7 +34,26 @@ class SideProvider {
 		this.types = instance.types();
 		this.names = instance.names();
 		this.elements = instance.elements();
+
 		this.sideOnly = instance.elements().getTypeElement(SIDE_ONLY_NAME).asType();
+		this.side = instance.elements().getTypeElement(SIDE_NAME).asType();
+
+
+	}
+
+	public Side getSideLiteral(ExpressionTree tree) {
+		// Detect Side.CLIENT and Side.SERVER
+		if (tree instanceof MemberSelectTree) {
+			JCFieldAccess member = (JCFieldAccess) tree;
+			if (member.selected instanceof IdentifierTree) {
+				JCIdent ident = (JCIdent) member.selected;
+				if (ident.sym.toString().equals(SIDE_NAME) && types.isSameType(member.type, side)) {
+					return Side.valueOf(member.name.toString());
+				}
+			}
+		}
+
+		return Side.NONE;
 	}
 
 	public Side getInferredSide(Element element) {

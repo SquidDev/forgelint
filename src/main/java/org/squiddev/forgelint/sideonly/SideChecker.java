@@ -109,7 +109,7 @@ public class SideChecker implements Checker {
 
 				// Stripped fields shouldn't initialise anything as the constructor/static initialiser
 				// isn't removed, hence an error at runtime.
-				if(fieldSide != Side.BOTH && tree.getInitializer() != null) {
+				if (fieldSide != Side.BOTH && tree.getInitializer() != null) {
 					instance.trees().printMessage(Diagnostic.Kind.ERROR,
 						"Should not initialise a field annotated with @SideOnly. This should be lazily loaded when required.",
 						tree.getInitializer(), root
@@ -202,7 +202,7 @@ public class SideChecker implements Checker {
 
 		private Side visitIf(Tree cond, Tree trueB, Tree falseB, Side side) {
 			side = scan(cond, side);
-			Side condSide = new SideStateVisitor(guardProvider).scan(cond, null);
+			Side condSide = new SideStateVisitor(guardProvider, sideProvider).scan(cond, null);
 			if (condSide == null || condSide == Side.NONE) condSide = Side.BOTH;
 
 			if (condSide != Side.BOTH) {
@@ -253,10 +253,12 @@ public class SideChecker implements Checker {
 	 * Attempts to determine whether a condition proves or disproves a given condition.
 	 */
 	private static class SideStateVisitor extends TreeScanner<Side, Void> {
-		private final GuardProvider provider;
+		private final GuardProvider guard;
+		private final SideProvider side;
 
-		private SideStateVisitor(GuardProvider provider) {
-			this.provider = provider;
+		private SideStateVisitor(GuardProvider guard, SideProvider side) {
+			this.guard = guard;
+			this.side = side;
 		}
 
 		@Override
@@ -273,6 +275,22 @@ public class SideChecker implements Checker {
 					Side left = scan(tree.getLeftOperand(), obj);
 					Side right = scan(tree.getRightOperand(), obj);
 					return left.highest(right);
+				}
+				case EQUAL_TO: {
+					Side left = side.getSideLiteral(tree.getLeftOperand());
+					Side right = side.getSideLiteral(tree.getRightOperand());
+					if (left != Side.NONE && right == Side.NONE) return left;
+					if (left == Side.NONE && right != Side.NONE) return right;
+
+					return super.visitBinary(tree, obj);
+				}
+				case NOT_EQUAL_TO: {
+					Side left = side.getSideLiteral(tree.getLeftOperand());
+					Side right = side.getSideLiteral(tree.getRightOperand());
+					if (left != Side.NONE && right == Side.NONE) return left.flip();
+					if (left == Side.NONE && right != Side.NONE) return right.flip();
+
+					return super.visitBinary(tree, obj);
 				}
 				default:
 					return super.visitBinary(tree, obj);
@@ -293,7 +311,7 @@ public class SideChecker implements Checker {
 		@Override
 		public Side visitMemberSelect(MemberSelectTree tree, Void obj) {
 			super.visitMemberSelect(tree, obj);
-			return provider.getGuard(tree);
+			return guard.getGuard(tree);
 		}
 
 		@Override
